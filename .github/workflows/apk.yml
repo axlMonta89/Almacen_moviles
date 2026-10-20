@@ -1,0 +1,50 @@
+name: Construir APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Localizar el proyecto de Android
+        id: proyecto
+        run: |
+          RUTA=$(find . -name settings.gradle -not -path '*/node_modules/*' | head -1)
+          if [ -z "$RUTA" ]; then
+            echo "No encontré el proyecto de Android (falta settings.gradle)."
+            exit 1
+          fi
+          DIR=$(dirname "$RUTA")
+          echo "Proyecto encontrado en: $DIR"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar el SDK de Android
+        uses: android-actions/setup-android@v3
+
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Compilar el APK
+        working-directory: ${{ steps.proyecto.outputs.dir }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Publicar el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CS-Almacen-apk
+          path: ${{ steps.proyecto.outputs.dir }}/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
